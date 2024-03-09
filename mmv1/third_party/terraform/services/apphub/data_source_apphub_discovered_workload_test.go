@@ -27,37 +27,38 @@ func TestDataSourceApphubDiscoveredWorkload_basic(t *testing.T) {
 
 func testDataSourceApphubDiscoveredWorkload_basic(context map[string]interface{}) string {
     return acctest.Nprintf(`
-resource "google_project" "service_project" {
-	project_id ="<%= ctx[:vars]['service_project_attachment_id'] %>"
-	name = "Service Project"
-	org_id = "<%= ctx[:test_env_vars]['org_id'] %>"
-}
-resource "google_apphub_service_project_attachment" "service_project_attachment" {
-  service_project_attachment_id = google_project.service_project.project_id
+data "google_apphub_discovered_workload" "catalog-workload" {
+  provider = google
+  location = "us-central1"
+  workload_uri = "//compute.googleapis.com/${google_compute_region_instance_group_manager.mig.id}"
+  depends_on = [google_compute_region_instance_group_manager.mig]
 }
 
-data "google_apphub_discovered_workload" "catalog-workload" {
-  location = "us-east1"
-  workload_uri = "//compute.googleapis.com/projects/472248274957/regions/us-east1/instanceGroups/l7-ilb-mig1"
+# VPC network
+resource "google_compute_network" "ilb_network" {
+  name                    = "l7-ilb-network-%{random_suffix}"
+  project                 = "tf-project-3-416711"
+  auto_create_subnetworks = false
 }
 
 # backend subnet
 resource "google_compute_subnetwork" "ilb_subnet" {
-  name          = "l7-ilb-subnet-%{random_suffix}"
-  project       = google_project.service_project.project_id
+  name          = "l7-ilb-subnetwork-%{random_suffix}"
+  project       = "tf-project-3-416711"
   ip_cidr_range = "10.0.1.0/24"
-  region        = "us-east1"
-  network       = "default"
+  region        = "us-central1"
+  network       = google_compute_network.ilb_network.id
+  depends_on = [google_compute_network.ilb_network]
 }
 
 # instance template
 resource "google_compute_instance_template" "instance_template" {
   name         = "l7-ilb-mig-template-%{random_suffix}"
-  project               = google_project.service_project.project_id
+  project               = "tf-project-3-416711"
   machine_type = "e2-small"
   tags         = ["http-server"]
   network_interface {
-    network    = "default"
+    network    = google_compute_network.ilb_network.id
     subnetwork = google_compute_subnetwork.ilb_subnet.id
     access_config {
       # add external ip to fetch packages
@@ -91,13 +92,12 @@ resource "google_compute_instance_template" "instance_template" {
   lifecycle {
     create_before_destroy = true
   }
-  depends_on = [google_compute_subnetwork.ilb_subnet]
+  depends_on = [google_compute_subnetwork.ilb_subnet, google_compute_network.ilb_network]
 }
-
 resource "google_compute_region_instance_group_manager" "mig" {
   name     = "l7-ilb-mig1-%{random_suffix}"
-  project               = google_project.service_project.project_id
-  region   = "us-east1"
+  project               = "tf-project-3-416711"
+  region   = "us-central1"
   version {
     instance_template = google_compute_instance_template.instance_template.id
     name              = "primary"
@@ -108,4 +108,5 @@ resource "google_compute_region_instance_group_manager" "mig" {
 }
 `, context)
 }
+
 

@@ -2,10 +2,14 @@ package apphub
 
 import (
     "fmt"
+    "log"
+    "strings"
+    "time"
 
     "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
     "github.com/hashicorp/terraform-provider-google/google/tpgresource"
     transport_tpg "github.com/hashicorp/terraform-provider-google/google/transport"
+    "google.golang.org/api/googleapi"
 )
 
 func DataSourceApphubDiscoveredWorkload() *schema.Resource {
@@ -73,40 +77,72 @@ func DataSourceApphubDiscoveredWorkload() *schema.Resource {
 }
 
 func dataSourceApphubDiscoveredWorkloadRead(d *schema.ResourceData, meta interface{}) error {
+	time.Sleep(120*time.Second)
         config := meta.(*transport_tpg.Config)
+        fmt.Printf("Config: %v", config)
         userAgent, err := tpgresource.GenerateUserAgentString(d, config.UserAgent)
         if err != nil {
                 return err
         }
-
-        url, err := tpgresource.ReplaceVars(d, config, "{{ApphubBasePath}}projects/{{project}}/locations/{{location}}/discoveredWorkloads:lookup?uri={{workload_uri}}" )
+        fmt.Printf("userAgent: %s", userAgent)
+        
+        workload_uri, err := tpgresource.ReplaceVars(d, config, "{{workload_uri}}")
+        if err != nil {
+        	return err
+        }
+        
+        workload_uri = strings.Replace(workload_uri, "instanceGroupManagers", "instanceGroups", 1)
+        fmt.Printf("Workload_uri: %s", workload_uri)
+	
+        url, err := tpgresource.ReplaceVars(d, config, fmt.Sprintf("{{ApphubBasePath}}projects/{{project}}/locations/{{location}}/discoveredWorkloads:lookup?uri=%s}", workload_uri))
         if err != nil {
                 return err
         }
+        
+        fmt.Printf("URL:%s",  url)
+        fmt.Printf("Error: %s", err)
 
         billingProject := ""
 
         // err == nil indicates that the billing_project value was found
         if bp, err := tpgresource.GetBillingProject(d, config); err == nil {
-                billingProject = bp
+            billingProject = bp
         }
+        
+        fmt.Printf("Billing: %s", billingProject)
 
         var res map[string]interface{}
 
         err = transport_tpg.Retry(transport_tpg.RetryOptions{
-        RetryFunc: func() (rerr error) {
-            res, rerr = transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
-                Config:    config,
-                Method:    "GET",
-                Project:   billingProject,
-                RawURL:    url,
-                UserAgent: userAgent,
-            })
-            return rerr
-            },
-            Timeout: d.Timeout(schema.TimeoutRead),
-        })
+		RetryFunc: func() (rerr error) {
+			res, rerr = transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+				Config:    config,
+				Method:    "GET",
+				Project:   billingProject,
+				RawURL:    url,
+				UserAgent: userAgent,
+			})
+			return rerr
+		},
+		Timeout: d.Timeout(schema.TimeoutRead),
+		ErrorRetryPredicates: []transport_tpg.RetryErrorPredicateFunc{
+			func(err error) (bool, string) {
+				gerr, ok := err.(*googleapi.Error)
+				if !ok {
+					return false, ""
+				}
 
+				if gerr.Code == 404 {
+					log.Printf("[DEBUG] Dismissed an error as retryable based on error code: %s", err)
+					return true, fmt.Sprintf("Retryable error code %d", gerr.Code)
+				}
+				return false, ""
+			},
+		},
+	})
+        fmt.Println(res, err, "Test print")
+
+	
         if err != nil {
             return transport_tpg.HandleDataSourceNotFoundError(err, d, fmt.Sprintf("ApphubDiscoveredWorkload %q", d.Id()), url)
         }
