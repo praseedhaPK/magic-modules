@@ -3,8 +3,6 @@ package apphub
 import (
     "fmt"
     "log"
-    "strings"
-    "time"
 
     "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
     "github.com/hashicorp/terraform-provider-google/google/tpgresource"
@@ -77,30 +75,16 @@ func DataSourceApphubDiscoveredWorkload() *schema.Resource {
 }
 
 func dataSourceApphubDiscoveredWorkloadRead(d *schema.ResourceData, meta interface{}) error {
-	time.Sleep(120*time.Second)
         config := meta.(*transport_tpg.Config)
-        fmt.Printf("Config: %v", config)
         userAgent, err := tpgresource.GenerateUserAgentString(d, config.UserAgent)
         if err != nil {
                 return err
         }
-        fmt.Printf("userAgent: %s", userAgent)
-        
-        workload_uri, err := tpgresource.ReplaceVars(d, config, "{{workload_uri}}")
-        if err != nil {
-        	return err
-        }
-        
-        workload_uri = strings.Replace(workload_uri, "instanceGroupManagers", "instanceGroups", 1)
-        fmt.Printf("Workload_uri: %s", workload_uri)
 	
-        url, err := tpgresource.ReplaceVars(d, config, fmt.Sprintf("{{ApphubBasePath}}projects/{{project}}/locations/{{location}}/discoveredWorkloads:lookup?uri=%s}", workload_uri))
+        url, err := tpgresource.ReplaceVars(d, config, fmt.Sprintf("{{ApphubBasePath}}projects/{{project}}/locations/{{location}}/discoveredWorkloads:lookup?uri={{workload_uri}}"))
         if err != nil {
                 return err
         }
-        
-        fmt.Printf("URL:%s",  url)
-        fmt.Printf("Error: %s", err)
 
         billingProject := ""
 
@@ -108,8 +92,6 @@ func dataSourceApphubDiscoveredWorkloadRead(d *schema.ResourceData, meta interfa
         if bp, err := tpgresource.GetBillingProject(d, config); err == nil {
             billingProject = bp
         }
-        
-        fmt.Printf("Billing: %s", billingProject)
 
         var res map[string]interface{}
 
@@ -140,8 +122,6 @@ func dataSourceApphubDiscoveredWorkloadRead(d *schema.ResourceData, meta interfa
 			},
 		},
 	})
-        fmt.Println(res, err, "Test print")
-
 	
         if err != nil {
             return transport_tpg.HandleDataSourceNotFoundError(err, d, fmt.Sprintf("ApphubDiscoveredWorkload %q", d.Id()), url)
