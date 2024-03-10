@@ -7,7 +7,7 @@ import (
     "github.com/hashicorp/terraform-provider-google/google/acctest"
 )
 
-func TestDataSourceApphubDiscoveredWorkload_basic(t *testing.T) {
+func TestAccDataSourceApphubDiscoveredWorkload_basic(t *testing.T) {
     t.Parallel()
 
     context := map[string]interface{}{
@@ -37,14 +37,14 @@ data "google_apphub_discovered_workload" "catalog-workload" {
 # VPC network
 resource "google_compute_network" "ilb_network" {
   name                    = "l7-ilb-network-%{random_suffix}"
-  project                 = "tf-project-4-416714"
+  project                 = "tf-project-5-416803"
   auto_create_subnetworks = false
 }
 
 # backend subnet
 resource "google_compute_subnetwork" "ilb_subnet" {
   name          = "l7-ilb-subnetwork-%{random_suffix}"
-  project       = "tf-project-4-416714"
+  project       = "tf-project-5-416803"
   ip_cidr_range = "10.0.1.0/24"
   region        = "us-central1"
   network       = google_compute_network.ilb_network.id
@@ -54,7 +54,7 @@ resource "google_compute_subnetwork" "ilb_subnet" {
 # instance template
 resource "google_compute_instance_template" "instance_template" {
   name         = "l7-ilb-mig-template-%{random_suffix}"
-  project               = "tf-project-4-416714"
+  project               = "tf-project-5-416803"
   machine_type = "e2-small"
   tags         = ["http-server"]
   network_interface {
@@ -96,7 +96,7 @@ resource "google_compute_instance_template" "instance_template" {
 }
 resource "google_compute_region_instance_group_manager" "mig" {
   name     = "l7-ilb-mig1-%{random_suffix}"
-  project               = "tf-project-4-416714"
+  project               = "tf-project-5-416803"
   region   = "us-central1"
   version {
     instance_template = google_compute_instance_template.instance_template.id

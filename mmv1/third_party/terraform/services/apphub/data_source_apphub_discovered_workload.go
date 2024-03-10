@@ -3,6 +3,7 @@ package apphub
 import (
     "fmt"
     "log"
+    "time"
 
     "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
     "github.com/hashicorp/terraform-provider-google/google/tpgresource"
@@ -75,6 +76,7 @@ func DataSourceApphubDiscoveredWorkload() *schema.Resource {
 }
 
 func dataSourceApphubDiscoveredWorkloadRead(d *schema.ResourceData, meta interface{}) error {
+	time.Sleep(120*time.Second)
         config := meta.(*transport_tpg.Config)
         userAgent, err := tpgresource.GenerateUserAgentString(d, config.UserAgent)
         if err != nil {
