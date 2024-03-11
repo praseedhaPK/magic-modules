@@ -30,8 +30,12 @@ func testDataSourceApphubDiscoveredWorkload_basic(context map[string]interface{}
 data "google_apphub_discovered_workload" "catalog-workload" {
   provider = google
   location = "us-central1"
-  workload_uri = "${replace(google_compute_region_instance_group_manager.mig.instance_group, "https://www.googleapis.com/compute/v1", "//compute.googleapis.com")}"
-  depends_on = [google_compute_region_instance_group_manager.mig]
+  for_each= data.google_compute_region_instance_group.ig.instances
+  workload_uri = "//compute.googleapis.com/${each.value.attributes.id}"
+}
+
+data "google_compute_region_instance_group" "ig" {
+  self_link = google_compute_region_instance_group_manager.mig.instance_group
 }
 
 # VPC network
